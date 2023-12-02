@@ -1,3 +1,5 @@
+This is a fork of the original repository [here](https://github.com/google-research/fooling-feature-visualizations/). Paper referenced below.
+
 # Code for "Don't trust your eyes: on the (un)reliability of feature visualizations"
 
 This repository contains code to replicate experiments from [Don't trust your eyes: on the (un)reliability of feature visualizations](https://arxiv.org/abs/2306.04719) by Robert Geirhos*, Roland S. Zimmermann*, Blair Bilodeau*, Wieland Brendel, and Been Kim.
