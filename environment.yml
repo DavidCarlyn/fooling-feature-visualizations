@@ -1,0 +1,12 @@
+name: fooling
+channels:
+  - defaults
+  - conda-forge
+  - pytorch
+  - nvidia
+dependencies:
+  - python >= 3.8
+  - pytorch >= 1.13
+  - torchvision
+  - pytorch-cuda=12.1
+  - scikit-image
