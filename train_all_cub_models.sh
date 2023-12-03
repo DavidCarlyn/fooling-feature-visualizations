@@ -1,10 +1,10 @@
-(python train_cub_model.py --model inceptionv1 --batch_size 64)
-&& (python train_cub_model.py --model resnet18 --batch_size 64)
-&& (python train_cub_model.py --model resnet34 --batch_size 64)
-&& (python train_cub_model.py --model resnet50 --batch_size 64)
-&& (python train_cub_model.py --model resnet101 --batch_size 64)
-&& (python train_cub_model.py --model resnet151 --batch_size 32)
-&& (python train_cub_model.py --model vgg11 --batch_size 64)
-&& (python train_cub_model.py --model vgg13 --batch_size 64)
-&& (python train_cub_model.py --model vgg16 --batch_size 64)
-&& (python train_cub_model.py --model vgg19 --batch_size 32)
+python train_cub_model.py --model inceptionv1 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model resnet18 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model resnet34 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model resnet50 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model resnet101 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model resnet152 --batch_size 32 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model vgg11 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model vgg13 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model vgg16 --batch_size 64 --data_root /local/scratch/cv_datasets/CUB_200_2011
+python train_cub_model.py --model vgg19 --batch_size 32 --data_root /local/scratch/cv_datasets/CUB_200_2011
