@@ -4,6 +4,9 @@ Implementation from https://github.com/rgeirhos/lucent/blob/dev/lucent/modelzoo/
 
 Main use to discriminator between real and visualization images in order to implment the fooling circuit
 """
+
+import torch.nn as nn
+
 class SimpleCNN(nn.Module):
   def __init__(self):
     super().__init__()
