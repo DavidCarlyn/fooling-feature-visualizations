@@ -41,7 +41,7 @@ def create_visulization_images(incep_net, vis_data_root, recalculate=False):
         os.makedirs(cls_dir, exist_ok=True)
         param_f = lambda: param.image(128, batch=35)
         #for j in tqdm(range(35), desc=f"Creating {i} visualizations", position=1, leave=False):
-        visuals = render.render_vis(incep_net, target, param_f=param_f, thresholds=thresholds, show_image=False, progress=True)
+        visuals = render.render_vis(incep_net, target, param_f=param_f, thresholds=thresholds, show_image=False, progress=False)
         for step, vis in enumerate(visuals):
             for batch, im in enumerate(vis):
                 Image.fromarray((np.array(im)*255).astype(np.uint8)).save(os.path.join(cls_dir, f"sample_{batch}_logstep_{step}.png"))
