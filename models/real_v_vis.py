@@ -23,7 +23,7 @@ class SimpleCNN(nn.Module):
       nn.ReLU(),
       nn.Conv2d(16, 3, 3, 1),
       nn.ReLU(),
-      Flatten(),
+      nn.Flatten(),
       nn.Dropout(0.3),
       nn.Linear(243, 1),
     )
