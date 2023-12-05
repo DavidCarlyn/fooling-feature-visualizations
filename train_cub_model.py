@@ -6,14 +6,63 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.utils.data import DataLoader
+import torchvision.transforms as T
 
 from models.utils import load_pretrained_model
 from datasets.cub import CUB_Dataset, train_transforms, test_transforms
 
+import lightning.pytorch as pl
+from lightning.pytorch.loggers.logger import Logger, rank_zero_experiment
+from lightning.pytorch.utilities import rank_zero_only
+
+class CUBLightningModel(pl.LightningModule):
+    def __init__(self, args, arch):
+        super().__init__()
+        self.args = args
+        self.arch = arch
+        self.loss_fn = nn.CrossEntropyLoss()
+
+    def calc_correct(self, out, lbls):
+        _, preds = torch.max(out, dim=1)
+
+        correct = (preds == lbls).sum().item()
+        return correct
+
+    def validation_step(self, batch, batch_idx):
+        imgs, lbls = batch
+        out = self.arch(imgs)
+        loss = self.loss_fn(out, lbls)
+        correct = self.calc_correct(out, lbls)
+
+        self.log_dict({
+            "val_acc" : correct / len(imgs),
+            "val_loss" : loss.item(),
+        }, on_epoch=True, on_step=False, sync_dist=True)
+
+    def training_step(self, batch, batch_idx):
+        imgs, lbls = batch
+        out = self.arch(imgs)
+        loss = self.loss_fn(out, lbls)
+        correct = self.calc_correct(out, lbls)
+
+        self.log_dict({
+            "train_acc" : correct / len(imgs),
+            "train_loss" : loss.item(),
+        }, on_epoch=True, on_step=False, sync_dist=True)
+        
+        return loss
+    
+    def configure_optimizers(self):
+        optimizer = optim.SGD(self.arch.parameters(), lr=0.001, momentum=0.9, weight_decay=5e-5)
+        return optimizer
+
 
 def load_data(data_root, batch_size):
-    train_dset = CUB_Dataset(data_root, split="train", transforms=train_transforms())
-    test_dset = CUB_Dataset(data_root, split="test", transforms=test_transforms())
+    tr_trans = train_transforms()
+    te_trans = test_transforms()
+    
+    train_dset = CUB_Dataset(data_root, split="train", transforms=tr_trans)
+    test_dset = CUB_Dataset(data_root, split="test", transforms=te_trans)
 
     train_dloader = DataLoader(train_dset, num_workers=4, batch_size=batch_size, shuffle=True)
     test_dloader = DataLoader(test_dset, num_workers=4, batch_size=batch_size, shuffle=False)
@@ -25,6 +74,7 @@ def train_model(model, train_dloader, val_dloader, epochs=100, lr=0.001):
     loss_fn = nn.CrossEntropyLoss()
 
     for epoch in tqdm(range(epochs), desc="Training", colour="yellow", position=0):
+        model.train()
         total_train_loss = 0
         total_train_correct = 0
         total_val_correct = 0
@@ -75,7 +125,7 @@ def save_model(model, path):
 def get_args():
     parser = ArgumentParser()
     parser.add_argument("--model", type=str, default="resnet18")
-    parser.add_argument("--data_root", type=str, default="E:\\datasets\\CUB_200_2011")
+    parser.add_argument("--data_root", type=str, default="/local/scratch/cv_datasets/CUB_200_2011")
     parser.add_argument("--epochs", type=int, default=100)
     parser.add_argument("--lr", type=float, default=0.001)
     parser.add_argument("--batch_size", type=int, default=16)
@@ -83,6 +133,17 @@ def get_args():
     
     return parser.parse_args()
 
+class MetricTracker(pl.Callback):
+
+    def __init__(self, args):
+        self.args = args
+
+    @rank_zero_only
+    def on_train_epoch_end(self, trainer, module):
+        out_str = ""
+        for key in trainer.logged_metrics:
+            out_str += f"{key}: {trainer.logged_metrics[key].item()} | "
+        print(out_str)
 
 if __name__ == "__main__":
     args = get_args()
@@ -90,5 +151,20 @@ if __name__ == "__main__":
 
     model = load_pretrained_model(args.model, num_classes=200).cuda()
     train_dloader, val_dloader = load_data(args.data_root, args.batch_size)
-    model = train_model(model, train_dloader, val_dloader, epochs=args.epochs, lr=args.lr)
-    save_model(model, os.path.join(args.outdir, f"cub_{args.model}.pt"))
+
+    lightning_model = CUBLightningModel(args, model)
+
+    mt = MetricTracker(args=args)
+    trainer = pl.Trainer(
+        accelerator="auto",
+        devices="auto",
+        max_epochs=args.epochs,
+        log_every_n_steps=1,
+        callbacks=[mt])
+
+    trainer.fit(lightning_model, train_dloader, val_dloader)
+
+
+    #model = train_model(model, train_dloader, val_dloader, epochs=args.epochs, lr=args.lr)
+
+    save_model(lightning_model.arch, os.path.join(args.outdir, f"cub_{args.model}.pt"))

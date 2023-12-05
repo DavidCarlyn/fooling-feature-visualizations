@@ -5,20 +5,23 @@ from tqdm import tqdm
 from PIL import Image
 import numpy as np
 
+import torch
 from torch.utils.data import Dataset
 import torchvision.transforms as T
 
 def train_transforms():
-    return T.Compose([
+    cur_transforms = T.Compose([
         T.Resize((224, 224)),
         T.ToTensor()
     ])
+    return lambda x: (cur_transforms(x) * 255) - 117
 
 def test_transforms():
-    return T.Compose([
+    cur_transforms = T.Compose([
         T.Resize((224, 224)),
         T.ToTensor()
     ])
+    return lambda x: (cur_transforms(x) * 255) - 117
 
 def normalize(x):
     return T.Normalize((0.485, 0.456, 0.406), (0.229, 0.224, 0.225))(x)
@@ -61,9 +64,15 @@ class FoolingDataset(Dataset):
                 elif split == "test" and cls_lbl <= split_point:
                     vis_paths.append(os.path.join(root, p))
 
+
         imgnet_data = list(zip(imgnet_paths, np.ones(len(imgnet_paths)).astype(np.uint8).tolist()))
         visual_data = list(zip(vis_paths, np.zeros(len(vis_paths)).astype(np.uint8).tolist()))
         self.data = imgnet_data + visual_data
+        
+        self.num_imgnet = len(imgnet_paths)
+        self.num_vis = len(vis_paths)
+
+        self.class_weights = torch.tensor([1 - (self.num_vis / len(self.data)), 1 - (self.num_imgnet / len(self.data))])
         if small_test:
             shuffle(self.data)
             self.data = self.data[:100]
@@ -78,7 +87,7 @@ class FoolingDataset(Dataset):
 
         if self.transforms is not None:
             img = self.transforms(img)
-            if lbl == 1:
-                img = normalize(img)
+            #if lbl == 1:
+            #    img = normalize(img)
 
         return img, lbl

@@ -10,6 +10,7 @@ import torch
 import torch.nn as nn
 from torch.optim import SGD
 from torch.utils.data import DataLoader
+from torch.utils.data.sampler import WeightedRandomSampler
 
 import lightning.pytorch as pl
 from lightning.pytorch.loggers.logger import Logger, rank_zero_experiment
@@ -21,10 +22,11 @@ from datasets.fooling import FoolingDataset, train_transforms, test_transforms
 def get_training_data(vis_data, imagenet_data, batch_size, small_test=False):
     train_dset = FoolingDataset(vis_data, imagenet_data, split="train", transforms=train_transforms(), small_test=small_test)
     val_dset = FoolingDataset(vis_data, imagenet_data, split="test", transforms=test_transforms(), small_test=small_test)
+    class_weights = train_dset.class_weights
 
-    train_dloader = DataLoader(train_dset, num_workers=8, batch_size=batch_size, shuffle=True)
-    val_dloader = DataLoader(val_dset, num_workers=8, batch_size=batch_size, shuffle=False)
-    return train_dloader, val_dloader
+    train_dloader = DataLoader(train_dset, num_workers=16, batch_size=batch_size, shuffle=True)
+    val_dloader = DataLoader(val_dset, num_workers=16, batch_size=batch_size, shuffle=False)
+    return train_dloader, val_dloader, class_weights
             
 def save_model(model, path):
     torch.save(model.state_dict(), path)
@@ -40,11 +42,12 @@ def get_args():
     return parser.parse_args()
 
 class SimpleLightningModel(pl.LightningModule):
-    def __init__(self, args, arch):
+    def __init__(self, args, arch, class_weights):
         super().__init__()
         self.args = args
         self.arch = arch
         self.loss_fn = nn.BCELoss()
+        self.class_weights = class_weights
 
     def calc_correct(self, out, lbls):
         out = out.clone().detach()
@@ -100,10 +103,10 @@ class MetricTracker(pl.Callback):
 if __name__ == "__main__":
     args = get_args()
 
-    train_dloader, test_dloader = get_training_data(args.vis_data, args.imagenet_data, args.batch_size, args.small_test)
+    train_dloader, test_dloader, class_weights = get_training_data(args.vis_data, args.imagenet_data, args.batch_size, args.small_test)
 
     classifier = SimpleCNN()
-    lightning_model = SimpleLightningModel(args, classifier)
+    lightning_model = SimpleLightningModel(args, classifier, class_weights)
 
     mt = MetricTracker(args=args)
     trainer = pl.Trainer(
