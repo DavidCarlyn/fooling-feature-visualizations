@@ -16,3 +16,4 @@ dependencies:
   - matplotlib
   - pip:
     - torch-lucent
+    - git+https://github.com/jeromerony/adversarial-library

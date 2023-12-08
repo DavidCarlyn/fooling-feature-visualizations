@@ -18,7 +18,7 @@ import torchvision.transforms as T
 from torchvision.datasets import ImageFolder
 
 from lucent.modelzoo.inceptionv1 import helper_layers
-from adv_lib.attacks import ddn
+from attacks.overrides import ddn, pgd_linf, str_attack
 
 from models.utils import load_pretrained_model
 from datasets.cub import CUB_Dataset, train_transforms
@@ -92,6 +92,10 @@ if __name__ == "__main__":
             #print(name, output.view(len(output), -1).shape)
         return hook
     
+    def reset_module_counts():
+        for name in module_counts:
+            module_counts[name] = 0
+    
     hooks = {}
     for name, module in tqdm(model.named_modules(), desc="Adding hooks to all modules"):
         def is_class_of(cls_defs):
@@ -121,8 +125,7 @@ if __name__ == "__main__":
             silent_units = compute_num_silent_units()
             pbar.set_description(f"Slient Units: {silent_units}")
 
-            for name in module_counts:
-                module_counts[name] = 0
+            reset_module_counts()
 
     out_str = f"Total # of silent units in {args.model}: {silent_units}"
     print(out_str)
@@ -137,20 +140,6 @@ if __name__ == "__main__":
                 T.ToTensor(),
             ])
 
-        # Hack to reset module counts when creating adversarial
-        class AdvCallback():
-            def __init__(self):
-                self.count = 0 
-            def accumulate_line(self, a, b, c):
-                self.count += 1
-                if self.count == 3:
-                    self.count = 0
-                    for name in module_counts:
-                        module_counts[name] = 0
-
-            def update_lines(self):
-                pass
-
         train_dset = CUB_Dataset(args.train_data, split="val", transforms=adv_transform())
         exs = None
         lbls = []
@@ -164,8 +153,14 @@ if __name__ == "__main__":
             lbls.append(lbl)
         lbls = torch.tensor(lbls).cuda()
         if args.attack_method == "ddn":
-            callback = AdvCallback()
-            adv_sample = ddn(model=model, inputs=exs, labels=lbls, steps=300, callback=callback)
+            adv_sample = ddn(model=model, inputs=exs, labels=lbls, steps=300, reset_module_counts=reset_module_counts)
+        elif args.attack_method == "pgd":
+            adv_sample = pgd_linf(model=model, inputs=exs, labels=lbls, steps=300, ε=0.2, reset_module_counts=reset_module_counts)
+        elif args.attack_method == "saa":
+            adv_sample = str_attack(model=model, inputs=exs, labels=lbls, reset_module_counts=reset_module_counts)
+        else:
+            raise NotImplementedError(f"{args.attack_method} not implemented!")
+
 
         silent_units = compute_num_silent_units()
         out_str = f"Total # of silent units in {args.model} after {args.attack_method} attack: {silent_units}"
